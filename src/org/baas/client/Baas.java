@@ -1,6 +1,12 @@
 package org.baas.client;
 
 import org.baas.shared.FieldVerifier;
+
+import com.google.gwt.appengine.channel.client.Channel;
+import com.google.gwt.appengine.channel.client.ChannelFactory;
+import com.google.gwt.appengine.channel.client.SocketError;
+import com.google.gwt.appengine.channel.client.SocketListener;
+import com.google.gwt.appengine.channel.client.ChannelFactory.ChannelCreatedCallback;
 import com.google.gwt.core.client.EntryPoint;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
@@ -8,6 +14,7 @@ import com.google.gwt.event.dom.client.ClickHandler;
 import com.google.gwt.event.dom.client.KeyCodes;
 import com.google.gwt.event.dom.client.KeyUpEvent;
 import com.google.gwt.event.dom.client.KeyUpHandler;
+import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.DialogBox;
@@ -20,20 +27,14 @@ import com.google.gwt.user.client.ui.VerticalPanel;
 /**
  * Entry point classes define <code>onModuleLoad()</code>.
  */
-public class Baas implements EntryPoint {
-	/**
-	 * The message displayed to the user when the server cannot be reached or
-	 * returns an error.
-	 */
-	private static final String SERVER_ERROR = "An error occurred while "
-			+ "attempting to contact the server. Please check your network "
-			+ "connection and try again.";
-
+public class Baas implements EntryPoint, ChannelCreatedCallback {
+	private static final String PROJECT = "monjoliprojet";
+	
 	/**
 	 * Create a remote service proxy to talk to the server-side Greeting service.
 	 */
-	private final GreetingServiceAsync greetingService = GWT
-			.create(GreetingService.class);
+	private final ProjectChannelAsync channelService = GWT
+			.create(ProjectChannel.class);
 
 	/**
 	 * This is the entry point method.
@@ -87,6 +88,7 @@ public class Baas implements EntryPoint {
 
 		// Create a handler for the sendButton and nameField
 		class MyHandler implements ClickHandler, KeyUpHandler {
+
 			/**
 			 * Fired when the user clicks on the sendButton.
 			 */
@@ -119,24 +121,24 @@ public class Baas implements EntryPoint {
 				sendButton.setEnabled(false);
 				textToServerLabel.setText(textToServer);
 				serverResponseLabel.setText("");
-				greetingService.greetServer(textToServer,
-						new AsyncCallback<String>() {
+				channelService.send(PROJECT,textToServer,
+						new AsyncCallback<Void>() {
 							public void onFailure(Throwable caught) {
 								// Show the RPC error message to the user
 								dialogBox
 										.setText("Remote Procedure Call - Failure");
 								serverResponseLabel
 										.addStyleName("serverResponseLabelError");
-								serverResponseLabel.setHTML(SERVER_ERROR);
+								serverResponseLabel.setHTML("error");
 								dialogBox.center();
 								closeButton.setFocus(true);
 							}
 
-							public void onSuccess(String result) {
+							public void onSuccess(Void result) {
 								dialogBox.setText("Remote Procedure Call");
 								serverResponseLabel
 										.removeStyleName("serverResponseLabelError");
-								serverResponseLabel.setHTML(result);
+								serverResponseLabel.setHTML("send");
 								dialogBox.center();
 								closeButton.setFocus(true);
 							}
@@ -148,5 +150,46 @@ public class Baas implements EntryPoint {
 		MyHandler handler = new MyHandler();
 		sendButton.addClickHandler(handler);
 		nameField.addKeyUpHandler(handler);
+		
+		
+		channelService.join(PROJECT, new AsyncCallback<String>() {
+
+			@Override
+			public void onFailure(Throwable caught) {
+			}
+
+			@Override
+			public void onSuccess(String result) {
+				ChannelFactory.createChannel(result,Baas.this);
+			}
+		});
+	}
+
+	@Override
+	public void onChannelCreated(Channel channel) {
+		channel.open(new SocketListener() {
+			
+			@Override
+			public void onOpen() {
+				Window.alert("opened");
+			}
+			
+			@Override
+			public void onMessage(String message) {
+				Window.alert("Message recu : " + message);
+				GWT.log(message);
+			}
+			
+			@Override
+			public void onError(SocketError error) {
+				Window.alert("error");
+				
+			}
+			
+			@Override
+			public void onClose() {
+				Window.alert("closed");
+			}
+		});
 	}
 }
